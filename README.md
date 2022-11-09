@@ -3,7 +3,7 @@
 Source: https://github.com/sherlock-audit/2022-10-mover-judging/issues/112 
 
 ## Found by 
-WATCHPUG, minhquanym, hansfriese, GalloDaSballo, berndartmueller
+0x52, hansfriese, berndartmueller, WATCHPUG, GalloDaSballo, minhquanym, Jeiwan
 
 ## Summary
 
