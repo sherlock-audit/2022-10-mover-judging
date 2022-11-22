@@ -3,7 +3,7 @@
 Source: https://github.com/sherlock-audit/2022-10-mover-judging/issues/112 
 
 ## Found by 
-0x52, hansfriese, berndartmueller, WATCHPUG, GalloDaSballo, minhquanym, Jeiwan
+minhquanym, Jeiwan, 0x52, hansfriese, WATCHPUG, GalloDaSballo, berndartmueller
 
 ## Summary
 
@@ -108,6 +108,57 @@ Hey @McMannaman, since #38 is also considered a duplicate, which is considered m
 
 We will not change the severity of this issue as protocol funds are at risk. 
 
+**McMannaman**
+
+The fixes are in https://github.com/viaMover/2022-10-mover/pull/1
+
+**jacksanford1**
+
+Bringing over some comments from https://github.com/viaMover/2022-10-mover/pull/1
+
+**McMannaman**
+Added reentrancy protection (also for issue #120)
+Plus an additional check that only the USDC amount expected is deducted from contract when bridging regardless of bytes call data.
+https://github.com/sherlock-audit/2022-10-mover-judging/issues/112
+
+**WatchPug**
+1. It's better to ensure that the whitelist is not shared between the two contracts. Otherwise, the attacker can still steal the topup fee from HardenedTopupProxy by using 1inch as targetAddress in their _bridgeTxData. Can you also make the changes required to the deploy script to reflect that?
+2. Seems like the attacker can still steal the exchange fee sitting on the exchangeProxyContract.
+
+**McMannaman**
+1. I have updated the migrations to reflect that whitelists would be separated (and 2 child contracts just to keep migrations-compatible).
+
+2. Could you please elaborate on how the attacker could steal exchange fee on the exchangeProxyContract? The fees are (if they would be non-zero) in USDC-only (the target token would be USDC), or, more generally in some single token, fees could be claimed before token change, before, e.g. hypothetically, to USDT. And if we know the target token, then lines
+https://github.com/viaMover/2022-10-mover/blob/fix-112-reentrancyamountcheck/cardtopup_contract/contracts/HardenedTopupProxy.sol#L443 and
+https://github.com/viaMover/2022-10-mover/blob/fix-112-reentrancyamountcheck/cardtopup_contract/contracts/ExchangeProxy.sol#L198
+should protect from draining fees:
+
+(non-swap scenario):
+1. an amount is stated as parameter when calling topup, then that amount is transferred to the Topup proxy;
+2. no swap is called;
+3. bridged amount is checked to exactly match provided amount (regardless of what is provided/called in the bridge data/call);
+
+(swap scenario):
+1. an amount is stated as parameter when calling topup, then that amount is transferred to the Topup proxy;
+2. swap is called, the actual received amount in USDC is now the amount we're working with (regardless of what is provided/called in the bridge data/call) -- deducting fees on both proxies;
+3. bridged amount is checked to exactly match amount stated by Exchange proxy (regardless of what is provided/called in the bridge data/call);
+
+so there are several assumptions we're working with:
+- fees are collected in single token type (otherwise they can be stolen, yes);
+- exchange proxy is callable only by Transfer proxy (a require https://github.com/viaMover/2022-10-mover/blob/fix-112-reentrancyamountcheck/cardtopup_contract/contracts/ExchangeProxy.sol#L151);
+- if user uses some manipulation to escape (avoid paying own) fees (don't know how this is achievable though without reentrancy) -- this is violation of terms of use, even if possible, should be of little rationale to user;
+
+Please point if I'm missing something (no code examples needed, just a description would be enough).
+
+@jack-the-pug 
+
+**WatchPug**
+> * fees are collected in single token type (otherwise they can be stolen, yes);
+
+Yeah, I think this is the case where the accumulated fees on the `exchangeProxyContract` can be stolen.
+
+I agree that this is not a major risk, though.
+
 
 
 # Issue M-1: `exchangeFee` can be escaped 
@@ -158,6 +209,14 @@ Consider adding `nonReentrant()` modifier to all the 3 non-view methods in the `
 **McMannaman**
 
 This is a valid point. Would be fixed by adding nonReentrant modifiers.
+
+**jack-the-pug**
+
+Fix confirmed
+
+**McMannaman**
+
+The fixes are in https://github.com/viaMover/2022-10-mover/pull/2
 
 
 
